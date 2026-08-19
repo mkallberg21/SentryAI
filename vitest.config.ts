@@ -12,9 +12,16 @@ export default defineConfig({
       '@sentryai/domain': src('domain'),
       '@sentryai/compliance': src('compliance'),
       '@sentryai/governance': src('governance'),
+      '@sentryai/db/testing': fileURLToPath(new URL('./packages/db/src/testing.ts', import.meta.url)),
+      '@sentryai/db': src('db'),
     },
   },
   test: {
+    // Integration tests share one Postgres; parallel files would race on the
+    // shared test role and on district-scoped audit sequences.
+    fileParallelism: false,
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     include: ['packages/**/*.test.ts', 'apps/**/*.test.ts'],
     environment: 'node',
   },

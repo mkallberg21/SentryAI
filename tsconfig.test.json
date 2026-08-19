@@ -5,13 +5,31 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
-    "types": ["node", "vitest/globals"],
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@sentryai/domain": ["./packages/domain/src/index.ts"],
-      "@sentryai/compliance": ["./packages/compliance/src/index.ts"],
-      "@sentryai/governance": ["./packages/governance/src/index.ts"]
+      "@sentryai/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@sentryai/compliance": [
+        "./packages/compliance/src/index.ts"
+      ],
+      "@sentryai/governance": [
+        "./packages/governance/src/index.ts"
+      ],
+      "@sentryai/db": [
+        "./packages/db/src/index.ts"
+      ],
+      "@sentryai/db/testing": [
+        "./packages/db/src/testing.ts"
+      ]
     }
   },
-  "include": ["packages/*/src/**/*.ts"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/*/src/**/*.ts"
+  ]
 }

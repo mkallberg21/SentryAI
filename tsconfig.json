@@ -3,6 +3,8 @@
   "references": [
     { "path": "./packages/domain" },
     { "path": "./packages/compliance" },
-    { "path": "./packages/governance" }
+    { "path": "./packages/governance" },
+    { "path": "./packages/db" },
+    { "path": "./apps/api" }
   ]
 }

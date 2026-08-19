@@ -1,0 +1,19 @@
+{
+  "name": "@sentryai/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@sentryai/compliance": "*",
+    "@sentryai/db": "*",
+    "@sentryai/domain": "*",
+    "@sentryai/governance": "*",
+    "graphql": "^16.10.0",
+    "graphql-yoga": "^5.10.4"
+  }
+}

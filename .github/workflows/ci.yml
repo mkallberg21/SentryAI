@@ -8,10 +8,33 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sentryai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Row-level security, the append-only audit trigger, and the
+      # separation-of-duties constraint are database behavior. They are tested
+      # against a real Postgres, through a non-superuser role, because a
+      # superuser bypasses RLS entirely and would make the assertions vacuous.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/sentryai_test
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -23,3 +46,21 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Confirm database tests actually ran
+        # A skipped integration suite looks identical to a passing one in the
+        # summary line. If DATABASE_URL ever stops reaching the service
+        # container, this fails the build instead of quietly covering nothing.
+        run: |
+          npx vitest run packages/db apps/api --reporter=json --outputFile=vitest-db.json
+          node -e "
+            const r = require('./vitest-db.json');
+            const total = r.numTotalTests ?? 0;
+            const passed = r.numPassedTests ?? 0;
+            const pending = r.numPendingTests ?? 0;
+            console.log('database-backed tests: ' + passed + ' passed, ' + pending + ' skipped of ' + total);
+            if (pending > 0 || passed === 0) {
+              console.error('Expected every database test to run. Check DATABASE_URL.');
+              process.exit(1);
+            }
+          "

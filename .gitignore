@@ -6,3 +6,5 @@ dist/
 !.env.example
 coverage/
 .DS_Store
+
+vitest-db.json
