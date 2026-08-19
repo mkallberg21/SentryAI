@@ -16,14 +16,16 @@ SentryAI is a compliance engine and system of record for that work. It watches e
 
 ## Status
 
-Early. The foundation is built and tested; the application layer is not.
+Early. Foundation, persistence, and API are built and tested against real Postgres. No web app or AI layer yet.
 
 | Area | State |
 | --- | --- |
 | Domain model (IEP, evaluation, meeting, notice, service, progress) | Built |
 | Compliance rules engine + state packs (federal, CA, TX) | Built, 47 tests |
 | Governance (hash-chained audit, field encryption, dual approval) | Built, 23 tests |
-| Persistence, API, web app | Not started |
+| Persistence: Postgres schema, RLS, append-only audit | Built, 29 tests against real Postgres |
+| API: GraphQL over the compliance engine | Built, 9 end-to-end tests |
+| Web app | Not started |
 | AI drafting layer | Not started — governance contract defined first, deliberately |
 | SIS/roster integration (Clever, ClassLink, OneRoster, Ed-Fi) | Not started |
 
@@ -34,6 +36,9 @@ packages/
   domain/       Vocabulary: students, IEPs, evaluations, meetings, notices, services
   compliance/   Day counting, rules engine, per-state policy packs
   governance/   Audit chain, field-level envelope encryption, dual approval
+  db/           Postgres schema, row-level security, repositories, context loader
+apps/
+  api/          GraphQL API
 docs/
   architecture.md     How the pieces fit and why
   ai-governance.md    What the model is and is not allowed to do
@@ -41,13 +46,16 @@ docs/
   pricing.md          Pricing model and the reasoning behind it
 ```
 
-## Three decisions worth knowing about
+## Four decisions worth knowing about
 
 **Day counting is a first-class module, not arithmetic at the call site.**
 Federal timelines run in calendar days, Texas evaluation timelines in school days, discipline timelines in school days the student was actually enrolled. A 45-school-day clock started on May 1 does not end in June — it ends the following September. Getting this wrong by one day is the difference between a clean visit and a finding, so it lives in [`calendar.ts`](packages/compliance/src/calendar.ts) with tests that assert the traps.
 
 **State rules are data, not code.**
 Every timeline is expressed as `{ days, basis }` in a `CompliancePolicy`, and rules read the policy rather than hardcoding a number. Adding a state means adding a pack. The constraint is deliberate: the moment state logic leaks into the rules, the fiftieth state costs as much as the first.
+
+**Isolation is enforced in the database, not in application code.**
+Row-level security scopes every table to one district, with a restrictive caseload policy on top — a case manager sees their assigned students, a director sees the district. `withTenant()` is the only query path; there is no unscoped entry point to reach for by accident. The tests run through a **non-superuser** role, because superusers bypass RLS entirely and a suite connecting as `postgres` would assert isolation that is not being enforced.
 
 **The audit log is immutable; the record is not.**
 FERPA gives parents the right to request amendment of education records, and state privacy laws require deletion at contract termination — so records must be correctable and erasable. What cannot be changed is the *log*. Every read, write, correction, and deletion is hash-chained, so a change can be made but never made to look like it never happened. See [`audit.ts`](packages/governance/src/audit.ts).
@@ -77,7 +85,15 @@ npm test
 npm run typecheck
 ```
 
-Node 20+. No database or cloud credentials are required to run the test suite — the rules engine is pure functions over fixtures, which is also what makes an audit answerable: "why did the system say we were late on 2026-03-14" has a deterministic answer.
+To run the database-backed tests, point `DATABASE_URL` at a Postgres you can create roles in:
+
+```bash
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/sentryai_test npm test
+```
+
+Without it, those tests skip and the rest still run. CI always runs them against a `postgres:17` service container and fails the build if they skip.
+
+Node 20+. No database or cloud credentials are required to run the unit suite — the rules engine is pure functions over fixtures, which is also what makes an audit answerable: "why did the system say we were late on 2026-03-14" has a deterministic answer.
 
 ## A note on claims
 
