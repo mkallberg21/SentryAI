@@ -77,6 +77,8 @@ export interface SeededDistrict {
   readonly directorId: string
   readonly caseManagerId: string
   readonly otherCaseManagerId: string
+  /** District-wide visibility, but not a permitted approver for IEP finalization. */
+  readonly administratorId: string
   readonly studentId: string
   readonly unassignedStudentId: string
   readonly iepId: string
@@ -146,6 +148,14 @@ export async function seedDistrict(
      VALUES ($1, $2, 'Other Manager', 'case-manager', 'Education Specialist')
      RETURNING id`,
     [district, `cm2-${suffix}@example.invalid`],
+  )
+
+  const administrator = await scalar(
+    tx,
+    `INSERT INTO users (district_id, email, name, role, credential)
+     VALUES ($1, $2, 'Avery Admin', 'district-administrator', 'Administrative Services')
+     RETURNING id`,
+    [district, `admin-${suffix}@example.invalid`],
   )
 
   const student = await scalar(
@@ -277,6 +287,7 @@ export async function seedDistrict(
     directorId: director,
     caseManagerId: caseManager,
     otherCaseManagerId: otherCaseManager,
+    administratorId: administrator,
     studentId: student,
     unassignedStudentId: unassigned,
     iepId: iep,

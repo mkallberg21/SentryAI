@@ -1,6 +1,7 @@
 export * from './client.js'
 export * from './context.js'
 export * from './crypto.js'
+export * from './errors.js'
 export { migrate } from './migrate.js'
 export * from './repositories/approvals.js'
 export * from './repositories/audit.js'

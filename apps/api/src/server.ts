@@ -2,12 +2,8 @@ import { createServer } from 'node:http'
 import { createPool, type Pool } from '@sentryai/db'
 import { LocalKeyProvider, type KeyProvider } from '@sentryai/governance'
 import { createYoga, type YogaServerInstance } from 'graphql-yoga'
-import {
-  AuthError,
-  DevTokenVerifier,
-  principalFromRequest,
-  type TokenVerifier,
-} from './auth.js'
+import { DevTokenVerifier, principalFromRequest, type TokenVerifier } from './auth.js'
+import { maskApiError } from './errors.js'
 import { schema, type ServerContext } from './schema.js'
 
 export interface ApiOptions {
@@ -24,18 +20,7 @@ export function createApi(options: ApiOptions): YogaServerInstance<{}, ServerCon
     graphiql: process.env['NODE_ENV'] !== 'production',
     landingPage: false,
     maskedErrors: {
-      maskError(error, message) {
-        // Domain errors carry text a case manager needs to see ("only the
-        // provider who delivered the session may sign its log"). Internal
-        // failures must not leak table names or SQL to the client.
-        if (error instanceof AuthError) return error
-        if (error instanceof Error && error.name === 'ApprovalError') return error
-        if (error instanceof Error && error.name === 'DecryptionError') {
-          return new Error('This record could not be read in the current context.')
-        }
-        console.error('Unhandled API error:', error)
-        return new Error(message)
-      },
+      maskError: maskApiError,
     },
     context: async ({ request }): Promise<ServerContext> => ({
       principal: await principalFromRequest(request, options.verifier),

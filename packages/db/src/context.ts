@@ -17,6 +17,7 @@ import {
 import type { KeyProvider } from '@sentryai/governance'
 import type { Queryable } from './client.js'
 import { fieldContext, opened, openedJson } from './crypto.js'
+import { NotFoundError } from './errors.js'
 
 /**
  * Assembles the full RuleContext for one student.
@@ -120,7 +121,7 @@ async function one(
 ): Promise<Record<string, unknown>> {
   const { rows } = await tx.query(sql, values)
   const row = rows[0]
-  if (row === undefined) throw new Error(missingMessage)
+  if (row === undefined) throw new NotFoundError(missingMessage)
   return row as Record<string, unknown>
 }
 

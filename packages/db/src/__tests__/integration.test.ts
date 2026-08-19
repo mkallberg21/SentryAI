@@ -3,7 +3,7 @@ import { plainDate } from '@sentryai/domain'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withoutTenantScope, withTenant, type Session } from '../client.js'
 import { loadRuleContext } from '../context.js'
-import { decideApproval, requestApproval } from '../repositories/approvals.js'
+import { decideApproval, listPendingApprovals, requestApproval } from '../repositories/approvals.js'
 import { appendAudit, readStudentAudit, verifyDistrictChain } from '../repositories/audit.js'
 import { findMedicaidGaps, recordServiceLog, signServiceLog } from '../repositories/serviceLogs.js'
 import { listCaseload } from '../repositories/students.js'
@@ -350,17 +350,52 @@ suite('database integration', () => {
         }),
       )
 
-      const otherManager: Session = {
+      // A district administrator can SEE the request (district-wide role) but
+      // is not a permitted approver for finalizing an IEP. Using another case
+      // manager here would prove nothing: RLS hides the request from them
+      // entirely, so the rejection would come from visibility rather than from
+      // the approval rules.
+      const administrator: Session = {
+        districtId: districtA.districtId,
+        userId: districtA.administratorId,
+        role: 'district-administrator',
+      }
+
+      await expect(
+        withTenant(h.app, administrator, (tx) =>
+          decideApproval(tx, administrator, request.id, 'approved', null),
+        ),
+      ).rejects.toThrow(/cannot approve "finalize-iep"/)
+    })
+
+    it('hides the request entirely from a case manager outside the caseload', async () => {
+      const request = await withTenant(h.app, caseManager(districtA), (tx) =>
+        requestApproval(tx, caseManager(districtA), {
+          action: 'finalize-iep',
+          subjectType: 'iep',
+          subjectId: districtA.iepId,
+          studentId: districtA.studentId,
+          justification: 'Annual review complete.',
+        }),
+      )
+
+      const stranger: Session = {
         districtId: districtA.districtId,
         userId: districtA.otherCaseManagerId,
         role: 'case-manager',
       }
 
+      // Not "you may not approve this" -- the request is not visible at all,
+      // because approval_requests carries the same caseload policy as the
+      // student record it concerns.
       await expect(
-        withTenant(h.app, otherManager, (tx) =>
-          decideApproval(tx, otherManager, request.id, 'approved', null),
+        withTenant(h.app, stranger, (tx) =>
+          decideApproval(tx, stranger, request.id, 'approved', null),
         ),
-      ).rejects.toThrow(/cannot approve "finalize-iep"/)
+      ).rejects.toThrow(/not found/)
+
+      const visible = await withTenant(h.app, stranger, (tx) => listPendingApprovals(tx))
+      expect(visible.map((r) => r.id)).not.toContain(request.id)
     })
 
     it('accepts a permitted second approver and audits it', async () => {
