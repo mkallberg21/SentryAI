@@ -29,7 +29,7 @@ suite('GraphQL API', () => {
 
   interface GraphQLResponse {
     data?: any
-    errors?: { message: string }[]
+    errors?: { message: string; extensions?: { code?: string } }[]
     /** Raw body and status, so a failed assertion can say what came back. */
     readonly raw: string
     readonly status: number
@@ -50,7 +50,7 @@ suite('GraphQL API', () => {
       body: JSON.stringify({ query, variables }),
     })
     const raw = await response.text()
-    let parsed: { data?: any; errors?: { message: string }[] } = {}
+    let parsed: { data?: any; errors?: { message: string; extensions?: { code?: string } }[] } = {}
     try {
       parsed = JSON.parse(raw)
     } catch {
@@ -64,15 +64,24 @@ suite('GraphQL API', () => {
    * not. A test that can only say "expected string, got undefined" cannot tell
    * you whether the server returned success, a different error, or HTML.
    */
-  const expectError = (result: GraphQLResponse, pattern: RegExp): void => {
+  const expectError = (
+    result: GraphQLResponse,
+    pattern: RegExp,
+    expectedCode?: string,
+  ): void => {
     const message = result.errors?.[0]?.message
     if (message === undefined) {
       throw new Error(
-        `Expected an error matching ${pattern}, but the response carried none.\n` +
+        `Expected an error matching ${pattern}, but the response carried no message.\n` +
           `HTTP ${result.status}\n${result.raw}`,
       )
     }
     expect(message).toMatch(pattern)
+    if (expectedCode !== undefined) {
+      // Guards the serialization contract: a bare Error loses its message on
+      // the wire, and the missing code is the first thing to notice.
+      expect(result.errors?.[0]?.extensions?.code).toBe(expectedCode)
+    }
   }
 
   beforeAll(async () => {
@@ -89,7 +98,7 @@ suite('GraphQL API', () => {
 
   it('rejects an unauthenticated request', async () => {
     const result = await call('{ me { userId } }', {}, null)
-    expectError(result, /Missing bearer token/)
+    expectError(result, /Missing bearer token/, 'UNAUTHENTICATED')
   })
 
   it('resolves the caller’s principal', async () => {
@@ -252,7 +261,7 @@ suite('GraphQL API', () => {
       { id: requestId },
       directorToken,
     )
-    expectError(decided, /cannot approve it/)
+    expectError(decided, /cannot approve it/, 'APPROVAL_REFUSED')
   })
 
   it('cannot reach another district by supplying its ids', async () => {
@@ -270,6 +279,6 @@ suite('GraphQL API', () => {
         role: 'special-education-director',
       }),
     )
-    expectError(result, /not found, or not visible/)
+    expectError(result, /not found, or not visible/, 'NOT_FOUND')
   })
 })
