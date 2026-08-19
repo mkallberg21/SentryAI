@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@sentryai/domain": ["./packages/domain/src/index.ts"],
+      "@sentryai/compliance": ["./packages/compliance/src/index.ts"],
+      "@sentryai/governance": ["./packages/governance/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts"]
+}

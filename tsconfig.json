@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/compliance" },
+    { "path": "./packages/governance" }
+  ]
+}
